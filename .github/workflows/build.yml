@@ -1,6 +1,6 @@
 name: Build OpenWrt NetEm
 
-on:
+"on":
   workflow_dispatch:
 
 jobs:

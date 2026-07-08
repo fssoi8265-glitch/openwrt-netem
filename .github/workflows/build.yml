@@ -1,0 +1,53 @@
+name: Build OpenWrt NetEm
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Clone OpenWrt
+        run: |
+          git clone --depth=1 --branch v24.10.2 https://github.com/openwrt/openwrt.git
+
+      - name: Copy Packages
+        run: |
+          mkdir -p openwrt/package/my_packages
+          cp -r net/network/netem-control openwrt/package/my_packages/
+          mkdir -p openwrt/package/my_packages/luci
+          cp -r luci/luci-app-netem openwrt/package/my_packages/luci/
+
+      - name: Update Feeds
+        working-directory: openwrt
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Configure
+        working-directory: openwrt
+        run: |
+          cat >> .config << EOF
+          CONFIG_TARGET_mvebu=y
+          CONFIG_TARGET_mvebu_cortexa9=y
+          CONFIG_PACKAGE_netem-control=m
+          CONFIG_PACKAGE_luci-app-netem=m
+          EOF
+          make defconfig
+
+      - name: Compile
+        working-directory: openwrt
+        run: |
+          make package/my_packages/netem-control/compile -j$(nproc) V=s
+          make package/my_packages/luci/luci-app-netem/compile -j$(nproc) V=s
+
+      - name: Upload IPKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-netem-ipk
+          path: |
+            openwrt/bin/packages/**/*.ipk
